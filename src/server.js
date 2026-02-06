@@ -16,6 +16,12 @@ const app = express();
 app.use(express.json());
 
 
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_PROD
@@ -53,7 +59,32 @@ app.use("/api", (req, res) => {
 
 app.get("/", (req, res) => {
   res.send("🚀 SentinelAI Backend is running");
+  
 });
+
+
+io.on("connection", (socket) => {
+  console.log("🟢 Client connected:", socket.id);
+
+  // Phone joins a camera room
+  socket.on("join-camera", (cameraId) => {
+    socket.join(cameraId);
+    console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
+  });
+
+  // Phone sends frame
+  socket.on("camera-frame", ({ cameraId, frame }) => {
+    // Relay frame to all dashboard viewers of this camera
+    socket.to(cameraId).emit("camera-frame", frame);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Client disconnected:", socket.id);
+  });
+});
+
+
+
 
 const PORT = process.env.PORT || 5000;
 
