@@ -23,6 +23,9 @@ app.use("/api/alerts", alertRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api", (req, res) => {
+  res.status(200).json({ message: "API endpoint found" });
+});
 
 app.get("/", (req, res) => {
   res.send("🚀 SentinelAI Backend is running");
