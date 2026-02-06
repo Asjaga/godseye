@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import http from "http";
+import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 
 import cameraRoutes from "./routes/camera.routes.js";
@@ -13,25 +15,22 @@ dotenv.config();
 
 const app = express();
 
+/* ------------------ MIDDLEWARE ------------------ */
 app.use(express.json());
-
-
-const io = new Server(server, {
-  cors: {
-    origin: "*"
-  }
-});
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_PROD
-].filter(Boolean).map(o => o.replace(/\/$/, "")); // remove trailing slash
+]
+  .filter(Boolean)
+  .map((o) => o.replace(/\/$/, ""));
 
 app.use(
   cors({
     origin: function (origin, callback) {
       console.log("ORIGIN =>", origin);
-      // allow server-to-server / Postman / curl
+
+      // Allow server-to-server / Postman / curl
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -46,35 +45,44 @@ app.use(
   })
 );
 
+/* ------------------ DB ------------------ */
 connectDB();
 
+/* ------------------ ROUTES ------------------ */
 app.use("/api/cameras", cameraRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+
 app.use("/api", (req, res) => {
   res.status(200).json({ message: "API endpoint found" });
 });
 
 app.get("/", (req, res) => {
   res.send("🚀 SentinelAI Backend is running");
-  
 });
 
+/* ------------------ HTTP + SOCKET SERVER ------------------ */
+const server = http.createServer(app);
 
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins.length ? allowedOrigins : "*",
+    credentials: true
+  }
+});
+
+/* ------------------ SOCKET LOGIC ------------------ */
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
 
-  // Phone joins a camera room
   socket.on("join-camera", (cameraId) => {
     socket.join(cameraId);
     console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
   });
 
-  // Phone sends frame
   socket.on("camera-frame", ({ cameraId, frame }) => {
-    // Relay frame to all dashboard viewers of this camera
     socket.to(cameraId).emit("camera-frame", frame);
   });
 
@@ -83,11 +91,9 @@ io.on("connection", (socket) => {
   });
 });
 
-
-
-
+/* ------------------ START SERVER ------------------ */
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🟢 Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🟢 Server + WebSocket running on port ${PORT}`);
 });
