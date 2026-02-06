@@ -14,11 +14,18 @@ export const getAlerts = async (req, res) => {
       .populate("cameraId", "name location")
       .sort({ createdAt: -1 });
 
-    res.status(200).json(alerts);
+    // 🚨 REMOVE BROKEN REFERENCES
+    const cleanAlerts = alerts.filter(
+      (alert) => alert.cameraId !== null
+    );
+
+    res.status(200).json(cleanAlerts);
   } catch (error) {
+    console.error("GET ALERTS ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // POST create alert (from AI)
 export const createAlert = async (req, res) => {
