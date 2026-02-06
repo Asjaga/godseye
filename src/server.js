@@ -19,7 +19,7 @@ app.use(express.json());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_PROD
-];
+].filter(Boolean).map(o => o.replace(/\/$/, "")); // remove trailing slash
 
 app.use(
   cors({
