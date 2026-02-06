@@ -25,24 +25,14 @@ const allowedOrigins = [
   .filter(Boolean)
   .map((o) => o.replace(/\/$/, ""));
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
+import cors from "cors";
 
-      // Allow server-to-server / Postman / curl
-      if (!origin) return callback(null, true);
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("CORS policy: Origin not allowed"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
-  })
-);
 
 /* ------------------ DB ------------------ */
 connectDB();
@@ -76,21 +66,34 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
 
-  socket.on("join-camera", (cameraId) => {
-    socket.join(cameraId);
-    console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
-  });
+socket.on("join-camera", (cameraId) => {
+  if (!cameraId || cameraId.includes(":")) {
+    console.log("❌ Invalid cameraId join attempt:", cameraId);
+    return;
+  }
 
-socket.on("camera-frame", ({ cameraId }) => {
-  console.log("📸 Frame received from", cameraId);
-  socket.to(cameraId).emit("camera-frame", frame);
+  socket.join(cameraId);
+  console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
 });
 
+
+  socket.on("camera-frame", ({ cameraId, frame }) => {
+    if (!cameraId || !frame) return;
+
+    console.log(`📸 Frame received from ${cameraId}`);
+
+    // Relay frame to dashboard viewers
+    socket.to(cameraId).emit("camera-frame", {
+      cameraId,
+      frame
+    });
+  });
 
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
   });
 });
+
 
 /* ------------------ START SERVER ------------------ */
 const PORT = process.env.PORT || 5000;
