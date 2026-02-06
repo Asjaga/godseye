@@ -25,8 +25,6 @@ const allowedOrigins = [
   .filter(Boolean)
   .map((o) => o.replace(/\/$/, ""));
 
-import cors from "cors";
-
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
