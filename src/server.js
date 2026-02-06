@@ -82,9 +82,11 @@ io.on("connection", (socket) => {
     console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
   });
 
-  socket.on("camera-frame", ({ cameraId, frame }) => {
-    socket.to(cameraId).emit("camera-frame", frame);
-  });
+socket.on("camera-frame", ({ cameraId }) => {
+  console.log("📸 Frame received from", cameraId);
+  socket.to(cameraId).emit("camera-frame", frame);
+});
+
 
   socket.on("disconnect", () => {
     console.log("🔴 Client disconnected:", socket.id);
