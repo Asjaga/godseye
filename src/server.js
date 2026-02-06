@@ -24,6 +24,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
+      console.log("ORIGIN =>", origin);
       // allow server-to-server / Postman / curl
       if (!origin) return callback(null, true);
 
