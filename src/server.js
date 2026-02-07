@@ -71,6 +71,10 @@ io.on("connection", (socket) => {
     socket.join(cameraId);
     console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
   });
+socket.on("ai-result", (data) => {
+  if (!data?.cameraId) return;
+  socket.to(data.cameraId).emit("ai-result", data);
+});
 
   /* ---- CAMERA FRAME RELAY (FULL PAYLOAD) ---- */
   socket.on("camera-frame", (payload) => {
