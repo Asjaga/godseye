@@ -20,17 +20,15 @@ app.use(express.json());
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_PROD
-]
-  .filter(Boolean)
-  .map((o) => o.replace(/\/$/, ""));
+  process.env.FRONTEND_URL_PROD,
+].filter(Boolean);
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
-
+app.use(
+  cors({
+    origin: allowedOrigins.length ? allowedOrigins : "*",
+    credentials: true,
+  })
+);
 
 /* ------------------ DB ------------------ */
 connectDB();
@@ -42,11 +40,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
-app.use("/api", (req, res) => {
-  res.status(200).json({ message: "API endpoint found" });
-});
-
-app.get("/", (req, res) => {
+app.get("/", (_, res) => {
   res.send("🚀 SentinelAI Backend is running");
 });
 
@@ -56,34 +50,49 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins.length ? allowedOrigins : "*",
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 /* ------------------ SOCKET LOGIC ------------------ */
 io.on("connection", (socket) => {
   console.log("🟢 Client connected:", socket.id);
 
-socket.on("join-camera", (cameraId) => {
-  if (!cameraId || cameraId.includes(":")) {
-    console.log("❌ Invalid cameraId join attempt:", cameraId);
-    return;
-  }
+  /* ---- JOIN CAMERA (SAFE, IDPOTENT) ---- */
+  socket.on("join-camera", (cameraId) => {
+    if (!cameraId || typeof cameraId !== "string") return;
 
-  socket.join(cameraId);
-  console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
-});
+    // ❗ Prevent duplicate joins
+    if (socket.rooms.has(cameraId)) {
+      console.log(`⚠️ Socket ${socket.id} already in camera ${cameraId}`);
+      return;
+    }
 
+    socket.join(cameraId);
+    console.log(`📷 Socket ${socket.id} joined camera ${cameraId}`);
+  });
 
-  socket.on("camera-frame", ({ cameraId, frame }) => {
+  /* ---- CAMERA FRAME RELAY (FULL PAYLOAD) ---- */
+  socket.on("camera-frame", (payload) => {
+    const {
+      cameraId,
+      frame,
+      boxes,
+      riskScore,
+      videoWidth,
+      videoHeight,
+    } = payload || {};
+
     if (!cameraId || !frame) return;
 
-    console.log(`📸 Frame received from ${cameraId}`);
-
-    // Relay frame to dashboard viewers
+    // 🔥 THIS IS THE IMPORTANT PART
     socket.to(cameraId).emit("camera-frame", {
       cameraId,
-      frame
+      frame,
+      boxes: Array.isArray(boxes) ? boxes : undefined,
+      riskScore: typeof riskScore === "number" ? riskScore : undefined,
+      videoWidth,
+      videoHeight,
     });
   });
 
@@ -91,7 +100,6 @@ socket.on("join-camera", (cameraId) => {
     console.log("🔴 Client disconnected:", socket.id);
   });
 });
-
 
 /* ------------------ START SERVER ------------------ */
 const PORT = process.env.PORT || 5000;
